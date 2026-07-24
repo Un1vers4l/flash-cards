@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { type Card, MAX_PHASE, isDue, phaseIntervalLabel } from '../lib/srs'
+import { type Card, MAX_DUE, MAX_PHASE, isDue, phaseIntervalLabel } from '../lib/srs'
 
 type Props = {
   cards: Card[]
@@ -7,8 +7,16 @@ type Props = {
   onManage: () => void
 }
 
+/** Show at most MAX_DUE; anything beyond is displayed as "9999+". */
+function formatDue(n: number): string {
+  return n > MAX_DUE ? `${MAX_DUE}+` : String(n)
+}
+
 export default function Home({ cards, onStartLearning, onManage }: Props) {
-  const due = useMemo(() => cards.filter((c) => isDue(c)), [cards])
+  const dueCount = useMemo(
+    () => cards.reduce((n, c) => (isDue(c) ? n + 1 : n), 0),
+    [cards],
+  )
 
   const phaseCounts = useMemo(() => {
     const counts = Array.from({ length: MAX_PHASE }, () => 0)
@@ -20,13 +28,13 @@ export default function Home({ cards, onStartLearning, onManage }: Props) {
 
   return (
     <div className="home">
-      <section className={`today-card ${due.length > 0 ? 'today-card-active' : 'today-card-clear'}`}>
+      <section className={`today-card ${dueCount > 0 ? 'today-card-active' : 'today-card-clear'}`}>
         <div className="today-card-body">
           <span className="today-eyebrow">Today's review</span>
-          {due.length > 0 ? (
+          {dueCount > 0 ? (
             <>
               <h2 className="today-count">
-                {due.length} <span>card{due.length === 1 ? '' : 's'} due</span>
+                {formatDue(dueCount)} <span>card{dueCount === 1 ? '' : 's'} due</span>
               </h2>
               <p className="today-sub">
                 Cards you don't finish today simply stay due until you do.
@@ -57,7 +65,7 @@ export default function Home({ cards, onStartLearning, onManage }: Props) {
           <span className="stat-label">Total cards</span>
         </div>
         <div className="stat">
-          <span className="stat-value">{due.length}</span>
+          <span className="stat-value">{formatDue(dueCount)}</span>
           <span className="stat-label">Due now</span>
         </div>
         <div className="stat">

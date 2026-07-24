@@ -1,15 +1,28 @@
 import { supabase } from './supabase'
-import { type Card, type ReviewResult, todayKey } from './srs'
+import { type Card, type ReviewResult, scheduleForPhase, todayKey } from './srs'
 
 const TABLE = 'cards'
 
 export async function fetchCards(): Promise<Card[]> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return (data ?? []) as Card[]
+  // Supabase caps every query at ~1000 rows, so page through with .range() until
+  // a short page comes back. Order by (created_at, id) — a total order — so
+  // paging is stable even though a bulk import gives many rows the same
+  // created_at timestamp.
+  const PAGE = 1000
+  const all: Card[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    const batch = (data ?? []) as Card[]
+    all.push(...batch)
+    if (batch.length < PAGE) break
+  }
+  return all
 }
 
 export type NewCard = {
@@ -62,6 +75,13 @@ export async function applyReview(id: string, result: ReviewResult): Promise<voi
     .update({ phase: result.phase, due_date: result.due_date })
     .eq('id', id)
   if (error) throw error
+}
+
+/** Manually move a card to a phase, rescheduling its due date accordingly. */
+export async function setCardPhase(id: string, phase: number): Promise<ReviewResult> {
+  const result = scheduleForPhase(phase)
+  await applyReview(id, result)
+  return result
 }
 
 export async function deleteCard(id: string): Promise<void> {

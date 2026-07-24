@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { isSupabaseConfigured } from './lib/supabase'
 import { fetchCards } from './lib/cards'
-import { type Card, isDue } from './lib/srs'
+import { type Card, MAX_DUE, isDue } from './lib/srs'
 import Login from './components/Login'
 import Home from './components/Home'
 import ManageVocab from './components/ManageVocab'
@@ -50,7 +50,11 @@ function Shell() {
     load()
   }, [load])
 
-  const dueCards = cards.filter((c) => isDue(c))
+  const patchCard = useCallback((id: string, changes: Partial<Card>) => {
+    setCards((cs) => cs.map((c) => (c.id === id ? { ...c, ...changes } : c)))
+  }, [])
+
+  const dueCards = cards.filter((c) => isDue(c)).slice(0, MAX_DUE)
 
   return (
     <div className="app">
@@ -98,7 +102,7 @@ function Shell() {
             onReviewed={load}
           />
         ) : view === 'manage' ? (
-          <ManageVocab cards={cards} onChanged={load} />
+          <ManageVocab cards={cards} onChanged={load} onCardPatched={patchCard} />
         ) : (
           <Home
             cards={cards}

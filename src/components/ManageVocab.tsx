@@ -1,17 +1,20 @@
 import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { type Card, phaseIntervalLabel } from '../lib/srs'
-import { createCard, createCards, deleteCard } from '../lib/cards'
+import { type Card, MAX_PHASE, phaseIntervalLabel, scheduleForPhase } from '../lib/srs'
+import { createCard, createCards, deleteCard, setCardPhase } from '../lib/cards'
 import { downloadTemplate, parseVocabFile } from '../lib/importCards'
 
 type Props = {
   cards: Card[]
   onChanged: () => void
+  onCardPatched: (id: string, changes: Partial<Card>) => void
 }
+
+const PHASES = Array.from({ length: MAX_PHASE }, (_, i) => i + 1)
 
 // A short list of common defaults; the field is free-text so any language works.
 const LANGUAGE_SUGGESTIONS = ['Spanish', 'English', 'French', 'Italian', 'Portuguese', 'Dutch']
 
-export default function ManageVocab({ cards, onChanged }: Props) {
+export default function ManageVocab({ cards, onChanged, onCardPatched }: Props) {
   const [german, setGerman] = useState('')
   const [translation, setTranslation] = useState('')
   const [language, setLanguage] = useState('Spanish')
@@ -35,6 +38,20 @@ export default function ManageVocab({ cards, onChanged }: Props) {
       console.error(err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handlePhaseChange(card: Card, newPhase: number) {
+    if (newPhase === card.phase) return
+    const previous = { phase: card.phase, due_date: card.due_date }
+    // Update the UI immediately, then persist; revert if the write fails.
+    onCardPatched(card.id, scheduleForPhase(newPhase))
+    try {
+      await setCardPhase(card.id, newPhase)
+    } catch (err) {
+      console.error(err)
+      onCardPatched(card.id, previous)
+      alert('Could not change the phase.')
     }
   }
 
@@ -201,9 +218,19 @@ export default function ManageVocab({ cards, onChanged }: Props) {
                 </div>
                 <div className="card-row-meta">
                   <span className="tag">{c.language}</span>
-                  <span className="tag tag-phase" title={phaseIntervalLabel(c.phase)}>
-                    Phase {c.phase}
-                  </span>
+                  <select
+                    className="phase-select"
+                    value={c.phase}
+                    onChange={(e) => handlePhaseChange(c, Number(e.target.value))}
+                    title={`Phase ${c.phase} · ${phaseIntervalLabel(c.phase)}`}
+                    aria-label={`Phase for ${c.german}`}
+                  >
+                    {PHASES.map((p) => (
+                      <option key={p} value={p}>
+                        Phase {p}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     className="icon-btn"
                     onClick={() => handleDelete(c)}

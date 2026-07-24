@@ -19,6 +19,9 @@
 export const MIN_PHASE = 1
 export const MAX_PHASE = 6
 
+/** Upper bound on how many due cards we surface/queue at once. */
+export const MAX_DUE = 9999
+
 /**
  * Review interval in days, indexed by phase (index 0 unused). Phase 1 is 0 days,
  * i.e. same-day: new and just-failed cards stay due today until answered right.
@@ -71,6 +74,15 @@ export function answerCorrect(card: Pick<Card, 'phase'>, today = todayKey()): Re
 /** Reset to phase 1 and make the card due again today. */
 export function answerWrong(_card: Pick<Card, 'phase'>, today = todayKey()): ReviewResult {
   return { phase: MIN_PHASE, due_date: today }
+}
+
+/**
+ * Manually move a card to a chosen phase, rescheduling its next review by that
+ * phase's interval (so moving a card up takes it out of today's queue).
+ */
+export function scheduleForPhase(phase: number, today = todayKey()): ReviewResult {
+  const p = Math.min(Math.max(Math.round(phase), MIN_PHASE), MAX_PHASE)
+  return { phase: p, due_date: addDays(today, PHASE_INTERVALS_DAYS[p]) }
 }
 
 /** Human label for how long a phase rests, e.g. "after 3 days". */
