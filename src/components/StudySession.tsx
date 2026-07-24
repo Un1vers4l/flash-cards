@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { type Card, answerCorrect, answerWrong, phaseIntervalLabel } from '../lib/srs'
 import { applyReview } from '../lib/cards'
 
@@ -9,29 +9,42 @@ type Props = {
 }
 
 export default function StudySession({ queue, onExit, onReviewed }: Props) {
-  // Snapshot the queue once so it doesn't reshuffle as cards get updated.
-  const cards = useMemo(() => queue, [queue])
-  const [index, setIndex] = useState(0)
+  // Snapshot the starting queue once. The session then runs on its own local
+  // state and keeps cycling until every card has been answered correctly.
+  const [initialTotal] = useState(() => queue.length)
+  const [remaining, setRemaining] = useState<Card[]>(() => queue)
+  const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set())
+  const [completed, setCompleted] = useState(0)
+  const [wrongAttempts, setWrongAttempts] = useState(0)
   const [flipped, setFlipped] = useState(false)
-  const [stats, setStats] = useState({ correct: 0, wrong: 0 })
   const [saving, setSaving] = useState(false)
 
-  const card = cards[index]
-  const done = index >= cards.length
+  const card = remaining[0]
+  const done = remaining.length === 0
+  const isRetry = card ? failedIds.has(card.id) : false
 
   async function grade(correct: boolean) {
     if (!card || saving) return
     setSaving(true)
+    // Correct → advance a phase. A phase-1 card (new or just-failed) graduates to
+    // phase 2 and comes back tomorrow. Wrong → drop to phase 1, keep drilling today.
     const result = correct ? answerCorrect(card) : answerWrong(card)
+
     try {
       await applyReview(card.id, result)
-      setStats((s) => ({
-        correct: s.correct + (correct ? 1 : 0),
-        wrong: s.wrong + (correct ? 0 : 1),
-      }))
       onReviewed()
+      if (correct) {
+        // Done for today: remove from the queue.
+        setRemaining((q) => q.slice(1))
+        setCompleted((c) => c + 1)
+      } else {
+        // Keep asking this card: mark it failed and send it to the back of the
+        // queue. If it's the only card left, it simply comes up again next.
+        setFailedIds((s) => new Set(s).add(card.id))
+        setWrongAttempts((w) => w + 1)
+        setRemaining((q) => [...q.slice(1), q[0]])
+      }
       setFlipped(false)
-      setIndex((i) => i + 1)
     } catch (err) {
       alert('Could not save your answer. Check your connection and try again.')
       console.error(err)
@@ -44,10 +57,12 @@ export default function StudySession({ queue, onExit, onReviewed }: Props) {
     return (
       <div className="session-done">
         <div className="session-done-emoji">🎉</div>
-        <h2>Session complete</h2>
+        <h2>All done for today</h2>
         <p className="session-done-stats">
-          <span className="pill pill-correct">{stats.correct} correct</span>
-          <span className="pill pill-wrong">{stats.wrong} to review</span>
+          <span className="pill pill-correct">{completed} learned</span>
+          {wrongAttempts > 0 && (
+            <span className="pill pill-wrong">{wrongAttempts} slip{wrongAttempts === 1 ? '' : 's'} fixed</span>
+          )}
         </p>
         <button className="btn btn-primary" onClick={onExit}>
           Back to home
@@ -63,14 +78,14 @@ export default function StudySession({ queue, onExit, onReviewed }: Props) {
           ← Exit
         </button>
         <div className="session-progress">
-          {index + 1} / {cards.length}
+          {completed} / {initialTotal} done
         </div>
       </div>
 
       <div className="progress-track">
         <div
           className="progress-fill"
-          style={{ width: `${(index / cards.length) * 100}%` }}
+          style={{ width: `${(completed / initialTotal) * 100}%` }}
         />
       </div>
 
@@ -82,6 +97,7 @@ export default function StudySession({ queue, onExit, onReviewed }: Props) {
       >
         <div className="flashcard-inner">
           <div className="flashcard-face flashcard-front">
+            {isRetry && <span className="retry-badge">↻ Again</span>}
             <span className="flashcard-lang">Deutsch</span>
             <span className="flashcard-word">{card.german}</span>
             <span className="flashcard-hint">Tap to reveal · Phase {card.phase}</span>

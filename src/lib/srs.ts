@@ -3,23 +3,27 @@
 // Cards live in one of six phases. Each phase has a review interval: the higher
 // the phase, the longer a card rests before it is shown again.
 //
-//   Phase 1 →  1 day
-//   Phase 2 →  3 days
-//   Phase 3 →  7 days
-//   Phase 4 → 14 days
-//   Phase 5 → 30 days
-//   Phase 6 → 90 days   (mature)
+//   Phase 1 → same day   (new / just-failed cards, drilled again today)
+//   Phase 2 → after 1 day
+//   Phase 3 → after 3 days
+//   Phase 4 → after 9 days
+//   Phase 5 → after 29 days
+//   Phase 6 → after 90 days   (mature)
 //
 // Answered correctly  → move up one phase (capped at 6) and schedule by the new
-//                        phase's interval.
+//                        phase's interval. A phase-1 card (new or just-failed)
+//                        therefore graduates to phase 2 and comes back tomorrow.
 // Answered wrong       → drop back to phase 1 and make it due again today, so it
 //                        keeps coming back until it sticks.
 
 export const MIN_PHASE = 1
 export const MAX_PHASE = 6
 
-/** Review interval in days, indexed by phase (index 0 unused). */
-export const PHASE_INTERVALS_DAYS = [0, 1, 3, 7, 14, 30, 90] as const
+/**
+ * Review interval in days, indexed by phase (index 0 unused). Phase 1 is 0 days,
+ * i.e. same-day: new and just-failed cards stay due today until answered right.
+ */
+export const PHASE_INTERVALS_DAYS = [0, 0, 1, 3, 9, 29, 90] as const
 
 export type Card = {
   id: string
@@ -69,9 +73,10 @@ export function answerWrong(_card: Pick<Card, 'phase'>, today = todayKey()): Rev
   return { phase: MIN_PHASE, due_date: today }
 }
 
-/** Human label for how long a phase rests, e.g. "every 3 days". */
+/** Human label for how long a phase rests, e.g. "after 3 days". */
 export function phaseIntervalLabel(phase: number): string {
   const days = PHASE_INTERVALS_DAYS[phase]
-  if (days === 1) return 'every day'
-  return `every ${days} days`
+  if (days <= 0) return 'same day'
+  if (days === 1) return 'after 1 day'
+  return `after ${days} days`
 }

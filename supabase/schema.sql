@@ -5,7 +5,7 @@ create table if not exists public.cards (
   id          uuid primary key default gen_random_uuid(),
   german      text not null,
   translation text not null,
-  language    text not null default 'English',
+  language    text not null default 'Spanish',
   phase       int  not null default 1 check (phase between 1 and 6),
   due_date    date not null default current_date,
   created_at  timestamptz not null default now()

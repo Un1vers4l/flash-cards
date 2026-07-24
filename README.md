@@ -5,27 +5,36 @@ system. You store German words together with a translation in any language,
 review the ones due today, and cards climb through phases as you get them right.
 
 - **Login** with a predefined username / password.
-- **Add vocabularies**, each with the language it should be asked in.
+- **Add vocabularies** one at a time, or **import many at once** from an Excel
+  (`.xlsx`) or `.csv` file. Columns: German, Translation, and optionally Language
+  (a header row is optional); a downloadable template is provided in the app.
 - **Six phases** with growing review intervals (see below).
 - **Home** shows exactly what's due today; unfinished cards stay due.
 - **Self-graded review**: German is shown, you recall the translation, flip the
-  card, and mark yourself correct or wrong.
+  card, and mark yourself correct or wrong. A session keeps cycling through the
+  due cards until every one is answered correctly — a card you get wrong drops to
+  phase 1 and keeps coming back in the same session until you nail it.
 - Data is stored in **Supabase**, so it syncs across devices.
 
 ## How the spaced repetition works
 
-Every card sits in one of six phases. Getting a card right moves it up one phase
-(capped at 6) and schedules it further into the future. Getting it wrong sends it
-straight back to phase 1 and makes it due again today.
+Every card sits in one of six phases. Getting a card right on the first try moves it up one phase (capped at 6) and
+schedules it further into the future. Getting it wrong sends it straight back to
+phase 1 and keeps it in today's session until you answer it correctly; once you
+do, it stays in phase 1 and returns the next day rather than jumping ahead.
 
-| Phase | Shown        |
-| ----- | ------------ |
-| 1     | every day    |
-| 2     | every 3 days |
-| 3     | every 7 days |
-| 4     | every 14 days |
-| 5     | every 30 days |
-| 6     | every 90 days |
+| Phase | Shown         |
+| ----- | ------------- |
+| 1     | same day      |
+| 2     | after 1 day   |
+| 3     | after 3 days  |
+| 4     | after 9 days  |
+| 5     | after 29 days |
+| 6     | after 90 days |
+
+Phase 1 is same-day: new and just-failed cards stay due today and are drilled
+again until you answer them correctly, at which point they graduate to phase 2
+and return the next day.
 
 Intervals live in `src/lib/srs.ts` (`PHASE_INTERVALS_DAYS`) if you want to tweak them.
 

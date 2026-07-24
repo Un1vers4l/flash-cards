@@ -541,6 +541,47 @@ body {
   padding: 20px 0;
 }
 
+/* ---------- Import ---------- */
+.import-hint {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.import-hint strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.import-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.import-btn {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.import-btn.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.import-status {
+  margin: 14px 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+.import-status.is-ok {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.import-status.is-error {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
 /* ---------- Study session ---------- */
 .session {
   display: flex;
@@ -612,6 +653,19 @@ body {
   background: linear-gradient(150deg, #4f46e5, #7c3aed);
   color: #fff;
   transform: rotateY(180deg);
+}
+.retry-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--danger);
+  background: var(--danger-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
 }
 .flashcard-lang {
   text-transform: uppercase;

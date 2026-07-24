@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { type Card, phaseIntervalLabel } from '../lib/srs'
-import { createCard, deleteCard } from '../lib/cards'
+import { createCard, createCards, deleteCard } from '../lib/cards'
+import { downloadTemplate, parseVocabFile } from '../lib/importCards'
 
 type Props = {
   cards: Card[]
@@ -8,16 +9,19 @@ type Props = {
 }
 
 // A short list of common defaults; the field is free-text so any language works.
-const LANGUAGE_SUGGESTIONS = ['English', 'Français', 'Español', 'Italiano', 'Nederlands']
+const LANGUAGE_SUGGESTIONS = ['Spanish', 'English', 'French', 'Italian', 'Portuguese', 'Dutch']
 
 export default function ManageVocab({ cards, onChanged }: Props) {
   const [german, setGerman] = useState('')
   const [translation, setTranslation] = useState('')
   const [language, setLanguage] = useState(
-    () => localStorage.getItem('flashcards.lastLanguage') || 'English',
+    () => localStorage.getItem('flashcards.lastLanguage') || 'Spanish',
   )
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState<{ text: string; error: boolean } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -45,6 +49,33 @@ export default function ManageVocab({ cards, onChanged }: Props) {
     } catch (err) {
       alert('Could not delete the card.')
       console.error(err)
+    }
+  }
+
+  async function handleImport(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportMsg(null)
+    try {
+      const { cards: parsed, skipped } = await parseVocabFile(file, language.trim() || 'Spanish')
+      if (parsed.length === 0) {
+        setImportMsg({
+          text: 'No valid rows found. Expected columns: German, Translation, (Language).',
+          error: true,
+        })
+      } else {
+        const n = await createCards(parsed)
+        const skipNote = skipped ? `, skipped ${skipped} incomplete row${skipped === 1 ? '' : 's'}` : ''
+        setImportMsg({ text: `Imported ${n} card${n === 1 ? '' : 's'}${skipNote}.`, error: false })
+        onChanged()
+      }
+    } catch (err) {
+      console.error(err)
+      setImportMsg({ text: 'Could not read that file. Use a .xlsx or .csv file.', error: true })
+    } finally {
+      setImporting(false)
+      if (fileRef.current) fileRef.current.value = '' // allow re-importing the same file
     }
   }
 
@@ -81,7 +112,7 @@ export default function ManageVocab({ cards, onChanged }: Props) {
               className="input"
               value={translation}
               onChange={(e) => setTranslation(e.target.value)}
-              placeholder="the house"
+              placeholder="la casa"
             />
           </label>
 
@@ -92,7 +123,7 @@ export default function ManageVocab({ cards, onChanged }: Props) {
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               list="language-suggestions"
-              placeholder="English"
+              placeholder="Spanish"
             />
             <datalist id="language-suggestions">
               {LANGUAGE_SUGGESTIONS.map((l) => (
@@ -105,6 +136,42 @@ export default function ManageVocab({ cards, onChanged }: Props) {
             {saving ? 'Saving…' : 'Add card'}
           </button>
         </form>
+      </section>
+
+      <section className="panel">
+        <h2 className="panel-title">Import from Excel</h2>
+        <p className="import-hint">
+          Upload an <strong>.xlsx</strong> or <strong>.csv</strong> file with a{' '}
+          <strong>German</strong> and a <strong>translation</strong> column (plus an optional{' '}
+          <strong>Language</strong> column — otherwise the language above is used). A header row
+          is optional; without one, the German column is detected automatically. All worksheets
+          are imported.
+        </p>
+        <div className="import-actions">
+          <label className={`btn btn-primary import-btn ${importing ? 'is-disabled' : ''}`}>
+            {importing ? 'Importing…' : '⬆ Choose file'}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImport}
+              disabled={importing}
+              hidden
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => downloadTemplate(language)}
+          >
+            Download template
+          </button>
+        </div>
+        {importMsg && (
+          <p className={`import-status ${importMsg.error ? 'is-error' : 'is-ok'}`}>
+            {importMsg.text}
+          </p>
+        )}
       </section>
 
       <section className="panel">
