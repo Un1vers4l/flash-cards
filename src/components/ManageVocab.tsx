@@ -14,9 +14,7 @@ const LANGUAGE_SUGGESTIONS = ['Spanish', 'English', 'French', 'Italian', 'Portug
 export default function ManageVocab({ cards, onChanged }: Props) {
   const [german, setGerman] = useState('')
   const [translation, setTranslation] = useState('')
-  const [language, setLanguage] = useState(
-    () => localStorage.getItem('flashcards.lastLanguage') || 'Spanish',
-  )
+  const [language, setLanguage] = useState('Spanish')
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState('')
   const [importing, setImporting] = useState(false)
@@ -29,7 +27,6 @@ export default function ManageVocab({ cards, onChanged }: Props) {
     setSaving(true)
     try {
       await createCard({ german, translation, language })
-      localStorage.setItem('flashcards.lastLanguage', language.trim())
       setGerman('')
       setTranslation('')
       onChanged()
@@ -117,7 +114,7 @@ export default function ManageVocab({ cards, onChanged }: Props) {
           </label>
 
           <label className="field">
-            <span className="field-label">Language asked</span>
+            <span className="field-label">Foreign language</span>
             <input
               className="input"
               value={language}
@@ -149,7 +146,7 @@ export default function ManageVocab({ cards, onChanged }: Props) {
         </p>
         <div className="import-actions">
           <label className={`btn btn-primary import-btn ${importing ? 'is-disabled' : ''}`}>
-            {importing ? 'Importing…' : '⬆ Choose file'}
+            {importing ? 'Importing…' : 'Choose file'}
             <input
               ref={fileRef}
               type="file"
@@ -213,7 +210,10 @@ export default function ManageVocab({ cards, onChanged }: Props) {
                     aria-label="Delete card"
                     title="Delete"
                   >
-                    🗑
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0v12a1 1 0 01-1 1H7a1 1 0 01-1-1V7" />
+                      <path d="M10 11v6M14 11v6" />
+                    </svg>
                   </button>
                 </div>
               </li>

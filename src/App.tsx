@@ -14,7 +14,7 @@ function ConfigWarning() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="auth-logo">⚙️</div>
+        <div className="monogram">V</div>
         <h1 className="auth-title">Almost there</h1>
         <p className="auth-subtitle">
           Supabase isn't configured yet. Create a <code>.env</code> file with
@@ -56,7 +56,7 @@ function Shell() {
     <div className="app">
       <header className="topbar">
         <button className="brand" onClick={() => setView('home')}>
-          <span className="brand-mark">📚</span>
+          <span className="brand-mark">V</span>
           <span className="brand-name">Vokabeltrainer</span>
         </button>
         <nav className="nav">

@@ -37,7 +37,7 @@ export default function Home({ cards, onStartLearning, onManage }: Props) {
             </>
           ) : (
             <>
-              <h2 className="today-count today-count-clear">All caught up 🎈</h2>
+              <h2 className="today-count today-count-clear">All caught up</h2>
               <p className="today-sub">
                 {cards.length === 0
                   ? 'Add some vocabularies to get started.'

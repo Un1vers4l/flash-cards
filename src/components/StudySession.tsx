@@ -56,8 +56,8 @@ export default function StudySession({ queue, onExit, onReviewed }: Props) {
   if (done) {
     return (
       <div className="session-done">
-        <div className="session-done-emoji">🎉</div>
         <h2>All done for today</h2>
+        <div className="session-done-rule" />
         <p className="session-done-stats">
           <span className="pill pill-correct">{completed} learned</span>
           {wrongAttempts > 0 && (
@@ -97,7 +97,7 @@ export default function StudySession({ queue, onExit, onReviewed }: Props) {
       >
         <div className="flashcard-inner">
           <div className="flashcard-face flashcard-front">
-            {isRetry && <span className="retry-badge">↻ Again</span>}
+            {isRetry && <span className="retry-badge">Again</span>}
             <span className="flashcard-lang">Deutsch</span>
             <span className="flashcard-word">{card.german}</span>
             <span className="flashcard-hint">Tap to reveal · Phase {card.phase}</span>
@@ -117,14 +117,14 @@ export default function StudySession({ queue, onExit, onReviewed }: Props) {
             onClick={() => grade(false)}
             disabled={saving}
           >
-            ✕ Wrong
+            Wrong
           </button>
           <button
             className="btn btn-success btn-lg"
             onClick={() => grade(true)}
             disabled={saving}
           >
-            ✓ Correct
+            Correct
           </button>
         </div>
       ) : (

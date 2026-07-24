@@ -16,9 +16,10 @@ export default function Login() {
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
-        <div className="auth-logo">📚</div>
-        <h1 className="auth-title">Vokabeltrainer</h1>
-        <p className="auth-subtitle">Sign in to keep learning</p>
+        <div className="monogram">V</div>
+        <span className="auth-eyebrow">Vokabeltrainer</span>
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="auth-subtitle">Sign in to continue learning</p>
 
         <label className="field">
           <span className="field-label">Username</span>
