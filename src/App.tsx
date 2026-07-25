@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { isSupabaseConfigured } from './lib/supabase'
 import { fetchCards } from './lib/cards'
+import { type Category, fetchCategories, isMissingTableError } from './lib/categories'
 import { type Card, MAX_DUE, isDue } from './lib/srs'
 import Login from './components/Login'
 import Home from './components/Home'
 import ManageVocab from './components/ManageVocab'
+import CategoriesView from './components/CategoriesView'
 import StudySession from './components/StudySession'
+import PracticeSession from './components/PracticeSession'
 
-type View = 'home' | 'manage' | 'study'
+type View = 'home' | 'manage' | 'categories' | 'study' | 'practice'
 
 function ConfigWarning() {
   return (
@@ -30,8 +33,18 @@ function Shell() {
   const { logout } = useAuth()
   const [view, setView] = useState<View>('home')
   const [cards, setCards] = useState<Card[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoriesMissing, setCategoriesMissing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // The queue fed into a graded study session (today's review or a phase).
+  const [studyQueue, setStudyQueue] = useState<Card[]>([])
+  // The card set + label for a manual practice session.
+  const [practice, setPractice] = useState<{ cards: Card[]; title: string }>({
+    cards: [],
+    title: '',
+  })
 
   const load = useCallback(async () => {
     try {
@@ -46,15 +59,46 @@ function Shell() {
     }
   }, [])
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const data = await fetchCategories()
+      setCategories(data)
+      setCategoriesMissing(false)
+    } catch (err) {
+      if (isMissingTableError(err)) setCategoriesMissing(true)
+      else console.error(err)
+    }
+  }, [])
+
   useEffect(() => {
     load()
-  }, [load])
+    loadCategories()
+  }, [load, loadCategories])
 
   const patchCard = useCallback((id: string, changes: Partial<Card>) => {
     setCards((cs) => cs.map((c) => (c.id === id ? { ...c, ...changes } : c)))
   }, [])
 
   const dueCards = cards.filter((c) => isDue(c)).slice(0, MAX_DUE)
+
+  function startDueStudy() {
+    if (dueCards.length === 0) return
+    setStudyQueue(dueCards)
+    setView('study')
+  }
+
+  function startPhaseStudy(phase: number) {
+    const queue = cards.filter((c) => c.phase === phase).slice(0, MAX_DUE)
+    if (queue.length === 0) return
+    setStudyQueue(queue)
+    setView('study')
+  }
+
+  function startPractice(practiceCards: Card[], title: string) {
+    if (practiceCards.length === 0) return
+    setPractice({ cards: practiceCards, title })
+    setView('practice')
+  }
 
   return (
     <div className="app">
@@ -76,6 +120,12 @@ function Shell() {
           >
             Cards
           </button>
+          <button
+            className={`nav-link ${view === 'categories' || view === 'practice' ? 'is-active' : ''}`}
+            onClick={() => setView('categories')}
+          >
+            Practice
+          </button>
           <button className="nav-link" onClick={logout}>
             Sign out
           </button>
@@ -94,19 +144,34 @@ function Shell() {
           </div>
         ) : view === 'study' ? (
           <StudySession
-            queue={dueCards}
+            queue={studyQueue}
             onExit={() => {
               setView('home')
               load()
             }}
             onReviewed={load}
           />
+        ) : view === 'practice' ? (
+          <PracticeSession
+            cards={practice.cards}
+            title={practice.title}
+            onExit={() => setView('categories')}
+          />
         ) : view === 'manage' ? (
           <ManageVocab cards={cards} onChanged={load} onCardPatched={patchCard} />
+        ) : view === 'categories' ? (
+          <CategoriesView
+            cards={cards}
+            categories={categories}
+            tableMissing={categoriesMissing}
+            onChanged={loadCategories}
+            onPractice={startPractice}
+          />
         ) : (
           <Home
             cards={cards}
-            onStartLearning={() => dueCards.length > 0 && setView('study')}
+            onStartLearning={startDueStudy}
+            onStartPhase={startPhaseStudy}
             onManage={() => setView('manage')}
           />
         )}

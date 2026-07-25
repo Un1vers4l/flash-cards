@@ -14,6 +14,14 @@ review the ones due today, and cards climb through phases as you get them right.
   card, and mark yourself correct or wrong. A session keeps cycling through the
   due cards until every one is answered correctly — a card you get wrong drops to
   phase 1 and keeps coming back in the same session until you nail it.
+- Three ways to study:
+  - **Today's review** — the daily spaced-repetition queue (home screen).
+  - **Learn by phase** — pick a phase on the home screen and drill every card in
+    it; answers still count (correct → up a phase, wrong → back to phase 1).
+  - **Practice** — group cards into named **categories** (or an ad-hoc selection)
+    and flip through them in random order with no grading, until you exit.
+- **Manual phase move**: on the Cards screen, each card has a phase selector to
+  move it to any phase (its next-due date is rescheduled to match).
 - Data is stored in **Supabase**, so it syncs across devices.
 
 ## How the spaced repetition works
@@ -50,6 +58,9 @@ npm install
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Open **SQL Editor** and run the contents of [`supabase/schema.sql`](supabase/schema.sql).
+   This creates both the `cards` and `categories` tables. If you set the project
+   up before categories existed, just run the `categories` block from that file
+   once to enable the Practice feature.
 3. In **Project Settings → API**, copy the **Project URL** and the **anon public** key.
 
 ### 3. Configure environment

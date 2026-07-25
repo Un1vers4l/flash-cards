@@ -4,6 +4,7 @@ import { type Card, MAX_DUE, MAX_PHASE, isDue, phaseIntervalLabel } from '../lib
 type Props = {
   cards: Card[]
   onStartLearning: () => void
+  onStartPhase: (phase: number) => void
   onManage: () => void
 }
 
@@ -12,7 +13,7 @@ function formatDue(n: number): string {
   return n > MAX_DUE ? `${MAX_DUE}+` : String(n)
 }
 
-export default function Home({ cards, onStartLearning, onManage }: Props) {
+export default function Home({ cards, onStartLearning, onStartPhase, onManage }: Props) {
   const dueCount = useMemo(
     () => cards.reduce((n, c) => (isDue(c) ? n + 1 : n), 0),
     [cards],
@@ -75,21 +76,35 @@ export default function Home({ cards, onStartLearning, onManage }: Props) {
       </div>
 
       <section className="panel">
-        <h2 className="panel-title">Progress by phase</h2>
+        <h2 className="panel-title">Learn by phase</h2>
+        <p className="import-hint">
+          Study every card in one phase (regardless of when it's next due). Answers still
+          count — correct moves a card up, wrong sends it back to phase 1. Tap a phase to start.
+        </p>
         <div className="phase-chart">
           {phaseCounts.map((count, i) => (
-            <div className="phase-bar-group" key={i}>
+            <button
+              type="button"
+              className="phase-bar-group"
+              key={i}
+              onClick={() => onStartPhase(i + 1)}
+              disabled={count === 0}
+              title={
+                count === 0
+                  ? `No cards in phase ${i + 1}`
+                  : `Study ${count} card${count === 1 ? '' : 's'} in phase ${i + 1}`
+              }
+            >
               <div className="phase-bar-track">
                 <div
                   className="phase-bar-fill"
                   style={{ height: `${(count / maxCount) * 100}%` }}
-                  title={`${count} card${count === 1 ? '' : 's'}`}
                 />
               </div>
               <span className="phase-bar-count">{count}</span>
               <span className="phase-bar-label">P{i + 1}</span>
               <span className="phase-bar-interval">{phaseIntervalLabel(i + 1)}</span>
-            </div>
+            </button>
           ))}
         </div>
       </section>

@@ -30,3 +30,23 @@ create policy "anon full access to cards"
   to anon
   using (true)
   with check (true);
+
+-- Categories: named collections of cards for manual practice.
+-- card_ids holds the member card ids; a missing card id is simply ignored when
+-- the app resolves a category, so no foreign key is required.
+create table if not exists public.categories (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  card_ids   uuid[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+alter table public.categories enable row level security;
+
+drop policy if exists "anon full access to categories" on public.categories;
+create policy "anon full access to categories"
+  on public.categories
+  for all
+  to anon
+  using (true)
+  with check (true);
