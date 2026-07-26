@@ -8,10 +8,17 @@ create table if not exists public.cards (
   language    text not null default 'Spanish',
   phase       int  not null default 1 check (phase between 1 and 6),
   due_date    date not null default current_date,
+  -- New/imported cards start inactive; activating a card puts it into phase 1.
+  active      boolean not null default false,
   created_at  timestamptz not null default now()
 );
 
 create index if not exists cards_due_date_idx on public.cards (due_date);
+
+-- Migration for existing projects: add the activation column, keep cards you're
+-- already learning (phase 2+) active, and deactivate the phase-1 backlog.
+alter table public.cards add column if not exists active boolean not null default false;
+update public.cards set active = true where phase > 1;
 
 -- Row Level Security.
 --

@@ -3,6 +3,7 @@ import { type Card, MAX_DUE, MAX_PHASE, isDue, phaseIntervalLabel } from '../lib
 
 type Props = {
   cards: Card[]
+  activationEnabled: boolean
   onStartLearning: () => void
   onStartPhase: (phase: number) => void
   onManage: () => void
@@ -13,17 +14,31 @@ function formatDue(n: number): string {
   return n > MAX_DUE ? `${MAX_DUE}+` : String(n)
 }
 
-export default function Home({ cards, onStartLearning, onStartPhase, onManage }: Props) {
+export default function Home({
+  cards,
+  activationEnabled,
+  onStartLearning,
+  onStartPhase,
+  onManage,
+}: Props) {
+  const isActive = (c: Card) => !activationEnabled || c.active === true
+
   const dueCount = useMemo(
-    () => cards.reduce((n, c) => (isDue(c) ? n + 1 : n), 0),
-    [cards],
+    () => cards.reduce((n, c) => (isActive(c) && isDue(c) ? n + 1 : n), 0),
+    [cards, activationEnabled],
   )
 
+  const inactiveCount = useMemo(
+    () => (activationEnabled ? cards.reduce((n, c) => (c.active ? n : n + 1), 0) : 0),
+    [cards, activationEnabled],
+  )
+
+  // Learn-by-phase only counts active cards.
   const phaseCounts = useMemo(() => {
     const counts = Array.from({ length: MAX_PHASE }, () => 0)
-    for (const c of cards) counts[c.phase - 1] += 1
+    for (const c of cards) if (isActive(c)) counts[c.phase - 1] += 1
     return counts
-  }, [cards])
+  }, [cards, activationEnabled])
 
   const maxCount = Math.max(1, ...phaseCounts)
 
@@ -50,10 +65,16 @@ export default function Home({ cards, onStartLearning, onStartPhase, onManage }:
               <p className="today-sub">
                 {cards.length === 0
                   ? 'Add some vocabularies to get started.'
-                  : 'Nothing due today. Come back tomorrow or add more cards.'}
+                  : inactiveCount > 0
+                    ? `Nothing due today. Activate some of your ${inactiveCount} inactive card${inactiveCount === 1 ? '' : 's'} to keep learning.`
+                    : 'Nothing due today. Come back tomorrow or add more cards.'}
               </p>
               <button className="btn btn-secondary btn-lg" onClick={onManage}>
-                {cards.length === 0 ? 'Add vocabularies' : 'Manage cards'}
+                {cards.length === 0
+                  ? 'Add vocabularies'
+                  : inactiveCount > 0
+                    ? 'Activate cards'
+                    : 'Manage cards'}
               </button>
             </>
           )}
@@ -70,8 +91,8 @@ export default function Home({ cards, onStartLearning, onStartPhase, onManage }:
           <span className="stat-label">Due now</span>
         </div>
         <div className="stat">
-          <span className="stat-value">{phaseCounts[MAX_PHASE - 1]}</span>
-          <span className="stat-label">Mastered (P{MAX_PHASE})</span>
+          <span className="stat-value">{activationEnabled ? inactiveCount : phaseCounts[MAX_PHASE - 1]}</span>
+          <span className="stat-label">{activationEnabled ? 'Inactive' : `Mastered (P${MAX_PHASE})`}</span>
         </div>
       </div>
 

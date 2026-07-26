@@ -37,6 +37,12 @@ export type Card = {
   /** ISO date (YYYY-MM-DD) on which the card next becomes due. */
   due_date: string
   created_at: string
+  /**
+   * Whether the card is part of the spaced-repetition flow. New/imported cards
+   * start inactive and only enter phase 1 once activated. Optional so the app
+   * still works before the `active` column migration has been run.
+   */
+  active?: boolean
 }
 
 /** Local (not UTC) YYYY-MM-DD for a given date — "today" from the learner's view. */

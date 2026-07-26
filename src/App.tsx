@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { isSupabaseConfigured } from './lib/supabase'
-import { fetchCards } from './lib/cards'
+import { activateCards, fetchCards, setCardActive } from './lib/cards'
 import { type Category, fetchCategories, isMissingTableError } from './lib/categories'
-import { type Card, MAX_DUE, isDue } from './lib/srs'
+import { type Card, MAX_DUE, isDue, todayKey } from './lib/srs'
 import Login from './components/Login'
 import Home from './components/Home'
 import ManageVocab from './components/ManageVocab'
@@ -79,7 +79,19 @@ function Shell() {
     setCards((cs) => cs.map((c) => (c.id === id ? { ...c, ...changes } : c)))
   }, [])
 
-  const dueCards = cards.filter((c) => isDue(c)).slice(0, MAX_DUE)
+  const patchMany = useCallback((ids: Set<string>, changes: Partial<Card>) => {
+    setCards((cs) => cs.map((c) => (ids.has(c.id) ? { ...c, ...changes } : c)))
+  }, [])
+
+  // The `active` column may not exist yet; if so, treat every card as active so
+  // the app behaves as before until the migration is run.
+  const activationEnabled = cards.some((c) => 'active' in c)
+  const isCardActive = useCallback(
+    (c: Card) => !activationEnabled || c.active === true,
+    [activationEnabled],
+  )
+
+  const dueCards = cards.filter((c) => isCardActive(c) && isDue(c)).slice(0, MAX_DUE)
 
   function startDueStudy() {
     if (dueCards.length === 0) return
@@ -88,7 +100,7 @@ function Shell() {
   }
 
   function startPhaseStudy(phase: number) {
-    const queue = cards.filter((c) => c.phase === phase).slice(0, MAX_DUE)
+    const queue = cards.filter((c) => isCardActive(c) && c.phase === phase).slice(0, MAX_DUE)
     if (queue.length === 0) return
     setStudyQueue(queue)
     setView('study')
@@ -98,6 +110,31 @@ function Shell() {
     if (practiceCards.length === 0) return
     setPractice({ cards: practiceCards, title })
     setView('practice')
+  }
+
+  async function handleSetActive(card: Card, active: boolean) {
+    const previous = { active: card.active, phase: card.phase, due_date: card.due_date }
+    patchCard(card.id, active ? { active: true, phase: 1, due_date: todayKey() } : { active: false })
+    try {
+      await setCardActive(card.id, active)
+    } catch (err) {
+      console.error(err)
+      patchCard(card.id, previous)
+      alert('Could not change the card. Have you run the activation migration?')
+    }
+  }
+
+  async function handleActivateMany(ids: string[]) {
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
+    patchMany(idSet, { active: true, phase: 1, due_date: todayKey() })
+    try {
+      await activateCards(ids)
+    } catch (err) {
+      console.error(err)
+      alert('Could not activate the cards. Have you run the activation migration?')
+      load()
+    }
   }
 
   return (
@@ -158,7 +195,14 @@ function Shell() {
             onExit={() => setView('categories')}
           />
         ) : view === 'manage' ? (
-          <ManageVocab cards={cards} onChanged={load} onCardPatched={patchCard} />
+          <ManageVocab
+            cards={cards}
+            activationEnabled={activationEnabled}
+            onChanged={load}
+            onCardPatched={patchCard}
+            onSetActive={handleSetActive}
+            onActivateMany={handleActivateMany}
+          />
         ) : view === 'categories' ? (
           <CategoriesView
             cards={cards}
@@ -170,6 +214,7 @@ function Shell() {
         ) : (
           <Home
             cards={cards}
+            activationEnabled={activationEnabled}
             onStartLearning={startDueStudy}
             onStartPhase={startPhaseStudy}
             onManage={() => setView('manage')}

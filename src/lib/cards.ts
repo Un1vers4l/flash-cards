@@ -31,17 +31,29 @@ export type NewCard = {
   language: string
 }
 
+// The `active` column may not exist yet (migration not run). Detect that so we
+// can retry the insert without it and keep add/import working in the meantime.
+function isMissingActiveColumn(err: unknown): boolean {
+  const e = err as { code?: string; message?: string }
+  return e?.code === 'PGRST204' || e?.code === '42703' || /'?active'? column|active/i.test(e?.message ?? '')
+}
+
 export async function createCard(input: NewCard): Promise<Card> {
   const row = {
     german: input.german.trim(),
     translation: input.translation.trim(),
     language: input.language.trim(),
     phase: 1,
-    due_date: todayKey(), // brand-new cards are due immediately
+    due_date: todayKey(),
+    active: true, // a manually added card is ready to learn right away
   }
-  const { data, error } = await supabase.from(TABLE).insert(row).select().single()
-  if (error) throw error
-  return data as Card
+  let res = await supabase.from(TABLE).insert(row).select().single()
+  if (res.error && isMissingActiveColumn(res.error)) {
+    const { active: _drop, ...legacy } = row
+    res = await supabase.from(TABLE).insert(legacy).select().single()
+  }
+  if (res.error) throw res.error
+  return res.data as Card
 }
 
 /** Insert many cards at once (used by the Excel/CSV importer). Returns the count inserted. */
@@ -54,17 +66,18 @@ export async function createCards(inputs: NewCard[]): Promise<number> {
     language: input.language.trim(),
     phase: 1,
     due_date: today,
+    active: false, // imported cards start inactive; the user activates them
   }))
-  // Insert in chunks so large imports stay under request size limits.
   const CHUNK = 500
   let inserted = 0
   for (let i = 0; i < rows.length; i += CHUNK) {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .insert(rows.slice(i, i + CHUNK))
-      .select('id')
-    if (error) throw error
-    inserted += data?.length ?? 0
+    const chunk = rows.slice(i, i + CHUNK)
+    let res = await supabase.from(TABLE).insert(chunk).select('id')
+    if (res.error && isMissingActiveColumn(res.error)) {
+      res = await supabase.from(TABLE).insert(chunk.map(({ active: _d, ...r }) => r)).select('id')
+    }
+    if (res.error) throw res.error
+    inserted += res.data?.length ?? 0
   }
   return inserted
 }
@@ -82,6 +95,36 @@ export async function setCardPhase(id: string, phase: number): Promise<ReviewRes
   const result = scheduleForPhase(phase)
   await applyReview(id, result)
   return result
+}
+
+/**
+ * Activate or deactivate a card. Activating puts it into phase 1, due today, so
+ * it enters the spaced-repetition flow. Returns the applied changes.
+ */
+export async function setCardActive(
+  id: string,
+  active: boolean,
+): Promise<Partial<Card>> {
+  const changes: Partial<Card> = active
+    ? { active: true, phase: 1, due_date: todayKey() }
+    : { active: false }
+  const { error } = await supabase.from(TABLE).update(changes).eq('id', id)
+  if (error) throw error
+  return changes
+}
+
+/** Activate many cards at once (bulk), putting each into phase 1 due today. */
+export async function activateCards(ids: string[]): Promise<Partial<Card>> {
+  const changes = { active: true, phase: 1, due_date: todayKey() }
+  const CHUNK = 500
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { error } = await supabase
+      .from(TABLE)
+      .update(changes)
+      .in('id', ids.slice(i, i + CHUNK))
+    if (error) throw error
+  }
+  return changes
 }
 
 export async function deleteCard(id: string): Promise<void> {

@@ -3,10 +3,15 @@ import { type Card, MAX_PHASE, phaseIntervalLabel, scheduleForPhase } from '../l
 import { createCard, createCards, deleteCard, setCardPhase } from '../lib/cards'
 import { downloadTemplate, parseVocabFile } from '../lib/importCards'
 
+type StatusFilter = 'all' | 'active' | 'inactive'
+
 type Props = {
   cards: Card[]
+  activationEnabled: boolean
   onChanged: () => void
   onCardPatched: (id: string, changes: Partial<Card>) => void
+  onSetActive: (card: Card, active: boolean) => void
+  onActivateMany: (ids: string[]) => void
 }
 
 const PHASES = Array.from({ length: MAX_PHASE }, (_, i) => i + 1)
@@ -14,15 +19,29 @@ const PHASES = Array.from({ length: MAX_PHASE }, (_, i) => i + 1)
 // A short list of common defaults; the field is free-text so any language works.
 const LANGUAGE_SUGGESTIONS = ['Spanish', 'English', 'French', 'Italian', 'Portuguese', 'Dutch']
 
-export default function ManageVocab({ cards, onChanged, onCardPatched }: Props) {
+export default function ManageVocab({
+  cards,
+  activationEnabled,
+  onChanged,
+  onCardPatched,
+  onSetActive,
+  onActivateMany,
+}: Props) {
   const [german, setGerman] = useState('')
   const [translation, setTranslation] = useState('')
   const [language, setLanguage] = useState('Spanish')
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState('')
+  const [status, setStatus] = useState<StatusFilter>('all')
+  const [batchSize, setBatchSize] = useState(20)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState<{ text: string; error: boolean } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const inactiveCards = useMemo(
+    () => (activationEnabled ? cards.filter((c) => !c.active) : []),
+    [cards, activationEnabled],
+  )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -81,7 +100,13 @@ export default function ManageVocab({ cards, onChanged, onCardPatched }: Props) 
       } else {
         const n = await createCards(parsed)
         const skipNote = skipped ? `, skipped ${skipped} incomplete row${skipped === 1 ? '' : 's'}` : ''
-        setImportMsg({ text: `Imported ${n} card${n === 1 ? '' : 's'}${skipNote}.`, error: false })
+        const activeNote = activationEnabled
+          ? ' They start inactive — activate them below to begin learning.'
+          : ''
+        setImportMsg({
+          text: `Imported ${n} card${n === 1 ? '' : 's'}${skipNote}.${activeNote}`,
+          error: false,
+        })
         onChanged()
       }
     } catch (err) {
@@ -95,14 +120,21 @@ export default function ManageVocab({ cards, onChanged, onCardPatched }: Props) 
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    if (!q) return cards
-    return cards.filter(
-      (c) =>
+    return cards.filter((c) => {
+      if (activationEnabled && status === 'active' && !c.active) return false
+      if (activationEnabled && status === 'inactive' && c.active) return false
+      if (!q) return true
+      return (
         c.german.toLowerCase().includes(q) ||
         c.translation.toLowerCase().includes(q) ||
-        c.language.toLowerCase().includes(q),
-    )
-  }, [cards, filter])
+        c.language.toLowerCase().includes(q)
+      )
+    })
+  }, [cards, filter, status, activationEnabled])
+
+  function activateNext() {
+    onActivateMany(inactiveCards.slice(0, Math.max(1, batchSize)).map((c) => c.id))
+  }
 
   return (
     <div className="manage">
@@ -203,6 +235,44 @@ export default function ManageVocab({ cards, onChanged, onCardPatched }: Props) 
           )}
         </div>
 
+        {activationEnabled && (
+          <>
+            <div className="status-filter">
+              {(['all', 'active', 'inactive'] as StatusFilter[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`status-tab ${status === s ? 'is-active' : ''}`}
+                  onClick={() => setStatus(s)}
+                >
+                  {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Inactive'}
+                  {s === 'inactive' && inactiveCards.length > 0 ? ` (${inactiveCards.length})` : ''}
+                </button>
+              ))}
+            </div>
+            {inactiveCards.length > 0 && (
+              <div className="activate-bar">
+                <span className="activate-bar-text">
+                  {inactiveCards.length} inactive card{inactiveCards.length === 1 ? '' : 's'} waiting.
+                </span>
+                <div className="activate-bar-controls">
+                  <input
+                    className="input input-sm activate-count"
+                    type="number"
+                    min={1}
+                    max={inactiveCards.length}
+                    value={batchSize}
+                    onChange={(e) => setBatchSize(Number(e.target.value))}
+                  />
+                  <button className="btn btn-primary btn-sm" onClick={activateNext}>
+                    Activate next {Math.min(Math.max(1, batchSize), inactiveCards.length)}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         {filtered.length === 0 ? (
           <p className="empty-hint">
             {cards.length === 0 ? 'No cards yet. Add your first one above.' : 'No matches.'}
@@ -210,7 +280,7 @@ export default function ManageVocab({ cards, onChanged, onCardPatched }: Props) 
         ) : (
           <ul className="card-list">
             {filtered.map((c) => (
-              <li key={c.id} className="card-row">
+              <li key={c.id} className={`card-row ${activationEnabled && !c.active ? 'is-inactive' : ''}`}>
                 <div className="card-row-main">
                   <span className="card-row-german">{c.german}</span>
                   <span className="card-row-arrow">→</span>
@@ -218,19 +288,43 @@ export default function ManageVocab({ cards, onChanged, onCardPatched }: Props) 
                 </div>
                 <div className="card-row-meta">
                   <span className="tag">{c.language}</span>
-                  <select
-                    className="phase-select"
-                    value={c.phase}
-                    onChange={(e) => handlePhaseChange(c, Number(e.target.value))}
-                    title={`Phase ${c.phase} · ${phaseIntervalLabel(c.phase)}`}
-                    aria-label={`Phase for ${c.german}`}
-                  >
-                    {PHASES.map((p) => (
-                      <option key={p} value={p}>
-                        Phase {p}
-                      </option>
-                    ))}
-                  </select>
+                  {activationEnabled && !c.active ? (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => onSetActive(c, true)}
+                      title="Activate — puts this card into phase 1, due today"
+                    >
+                      Activate
+                    </button>
+                  ) : (
+                    <>
+                      <select
+                        className="phase-select"
+                        value={c.phase}
+                        onChange={(e) => handlePhaseChange(c, Number(e.target.value))}
+                        title={`Phase ${c.phase} · ${phaseIntervalLabel(c.phase)}`}
+                        aria-label={`Phase for ${c.german}`}
+                      >
+                        {PHASES.map((p) => (
+                          <option key={p} value={p}>
+                            Phase {p}
+                          </option>
+                        ))}
+                      </select>
+                      {activationEnabled && (
+                        <button
+                          className="icon-btn"
+                          onClick={() => onSetActive(c, false)}
+                          aria-label="Deactivate card"
+                          title="Deactivate"
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18.36 6.64A9 9 0 1 1 5.64 6.64M12 2v10" />
+                          </svg>
+                        </button>
+                      )}
+                    </>
+                  )}
                   <button
                     className="icon-btn"
                     onClick={() => handleDelete(c)}

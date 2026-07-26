@@ -22,6 +22,11 @@ review the ones due today, and cards climb through phases as you get them right.
     and flip through them in random order with no grading, until you exit.
 - **Manual phase move**: on the Cards screen, each card has a phase selector to
   move it to any phase (its next-due date is rescheduled to match).
+- **Activation gate**: new and imported cards start **inactive** so a big import
+  doesn't flood your daily review. On the Cards screen you activate cards — one at
+  a time or in batches ("Activate next N") — and activating a card is what puts it
+  into phase 1 (due today). Only active cards appear in Today's review and
+  Learn-by-phase.
 - Data is stored in **Supabase**, so it syncs across devices.
 
 ## How the spaced repetition works
