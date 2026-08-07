@@ -2,6 +2,9 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# cached verb dataset (re-downloaded on demand by scripts/generate-verbs.mjs)
+scripts/jehle.csv
 .env
 .env.*
 !.env.example

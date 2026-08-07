@@ -103,6 +103,28 @@ Open the printed URL and sign in with the username / password you set.
 > Render works too: create a **Static Site**, build command `npm run build`,
 > publish directory `dist`, and add the same environment variables.
 
+## Maintaining conjugation data
+
+Conjugations live in the `verbs` table and are **not** generated automatically
+when you add vocabulary. After adding new verbs (single cards or an Excel
+import), run the generator — it's **incremental**, so it only adds verbs that
+don't have conjugations yet and leaves existing ones untouched:
+
+```bash
+npm run verbs:staging   # against the staging DB (.env.development)
+npm run verbs:prod      # against the production DB (.env.production)
+```
+
+Useful flags (append after `--`, e.g. `npm run verbs:prod -- --dry`):
+
+- `--dry` — preview what would be added, write nothing.
+- `--rebuild` — wipe the `verbs` table and regenerate everything from scratch.
+
+The script reads your cards, detects verbs, and builds the four core tenses from
+the Jehle dataset (auto-downloaded on first run), prefix-derivation for
+compounds, and a regular conjugator. Anything it can't produce reliably is
+listed as "skipped" rather than guessed — add those by hand if you need them.
+
 ## A note on security
 
 The login is a lightweight gate for a single-user personal app, and the app talks
