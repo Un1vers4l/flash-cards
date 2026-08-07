@@ -58,18 +58,22 @@ function parseCsv(text) {
 
 const TENSE = { Presente: 'presente', 'Pretérito': 'indefinido', Imperfecto: 'imperfecto', Futuro: 'futuro' }
 const PERSONS = ['yo', 'tu', 'el', 'nosotros', 'vosotros', 'ellos']
-const TENSE_KEYS = ['presente', 'indefinido', 'imperfecto', 'futuro']
+const CORE_INDIC = ['presente', 'indefinido', 'imperfecto', 'futuro']
+const TENSE_KEYS = [...CORE_INDIC, 'subjuntivo']
 const jehle = new Map()
 for (const row of parseCsv(fs.readFileSync(JEHLE_PATH, 'utf8')).slice(1)) {
-  if (row[2] !== 'Indicativo' || !TENSE[row[4]]) continue
+  let key = null
+  if (row[2] === 'Indicativo' && TENSE[row[4]]) key = TENSE[row[4]]
+  else if (row[2] === 'Subjuntivo' && row[4] === 'Presente') key = 'subjuntivo'
+  if (!key) continue
   const forms = { yo: row[7], tu: row[8], el: row[9], nosotros: row[10], vosotros: row[11], ellos: row[12] }
   if (!jehle.has(row[0])) jehle.set(row[0], {})
-  jehle.get(row[0])[TENSE[row[4]]] = forms
+  jehle.get(row[0])[key] = forms
 }
 const jehleCore = (base) => {
   const src = jehle.get(base); if (!src) return null
   const out = {}; for (const t of TENSE_KEYS) if (src[t]) out[t] = src[t]
-  return Object.keys(out).length === 4 ? out : null
+  return CORE_INDIC.every((t) => out[t]) ? out : null // require the 4 indicative; subjuntivo added if present
 }
 
 const REG = { ar: ['o', 'as', 'a', 'amos', 'áis', 'an'], er: ['o', 'es', 'e', 'emos', 'éis', 'en'], ir: ['o', 'es', 'e', 'imos', 'ís', 'en'] }
@@ -77,21 +81,29 @@ const PRET = { ar: ['é', 'aste', 'ó', 'amos', 'asteis', 'aron'], er: ['í', 'i
 const IMPF = { ar: ['aba', 'abas', 'aba', 'ábamos', 'abais', 'aban'], er: ['ía', 'ías', 'ía', 'íamos', 'íais', 'ían'], ir: ['ía', 'ías', 'ía', 'íamos', 'íais', 'ían'] }
 const FUT = ['é', 'ás', 'á', 'emos', 'éis', 'án']
 const RISKY = /(acer|ecer|ocer|ucir|uir|eer|ñir|güir|iar|uar)$/
+const SUBJ = { ar: ['e', 'es', 'e', 'emos', 'éis', 'en'], er: ['a', 'as', 'a', 'amos', 'áis', 'an'], ir: ['a', 'as', 'a', 'amos', 'áis', 'an'] }
 const toObj = (arr) => { const o = {}; PERSONS.forEach((p, i) => (o[p] = arr[i])); return o }
 function regularConjugate(base) {
   const end = base.slice(-2); if (!REG[end] || RISKY.test(base)) return null
   const stem = base.slice(0, -2)
+  const pres = REG[end].map((e) => stem + e)
   const pret = PRET[end].map((e) => stem + e)
+  // orthographic-preserving stem for the subjunctive (and pretérito yo / presente yo)
+  let subjStem = stem
   if (end === 'ar') {
-    if (base.endsWith('car')) pret[0] = base.slice(0, -3) + 'qué'
-    else if (base.endsWith('gar')) pret[0] = base.slice(0, -3) + 'gué'
-    else if (base.endsWith('zar')) pret[0] = base.slice(0, -3) + 'cé'
+    if (base.endsWith('car')) { pret[0] = base.slice(0, -3) + 'qué'; subjStem = stem.slice(0, -1) + 'qu' }
+    else if (base.endsWith('gar')) { pret[0] = base.slice(0, -3) + 'gué'; subjStem = stem.slice(0, -1) + 'gu' }
+    else if (base.endsWith('zar')) { pret[0] = base.slice(0, -3) + 'cé'; subjStem = stem.slice(0, -1) + 'c' }
+  } else {
+    if (/g$/.test(stem)) { subjStem = stem.slice(0, -1) + 'j'; pres[0] = subjStem + 'o' } // coger→cojo/coja
+    else if (/[^aeiou]c$/.test(stem)) { subjStem = stem.slice(0, -1) + 'z'; pres[0] = subjStem + 'o' } // vencer→venzo/venza
   }
   return {
-    presente: toObj(REG[end].map((e) => stem + e)),
+    presente: toObj(pres),
     indefinido: toObj(pret),
     imperfecto: toObj(IMPF[end].map((e) => stem + e)),
     futuro: toObj(FUT.map((e) => base + e)),
+    subjuntivo: toObj(SUBJ[end].map((e) => subjStem + e)),
   }
 }
 const PREFIXES = ['re', 'des', 'pre', 'com', 'con', 'en', 'em', 'ante', 'contra', 'sobre', 'entre', 'dis', 'in', 'im', 'ex', 'sub', 'tras', 'trans', 'super', 'inter', 'auto', 'a', 'de', 'pro']
@@ -101,7 +113,7 @@ function deriveByPrefix(base) {
     const root = base.slice(p.length)
     if (root.length < 4) continue
     const core = jehleCore(root); if (!core) continue
-    const out = {}; for (const t of TENSE_KEYS) out[t] = toObj(PERSONS.map((per) => p + core[t][per]))
+    const out = {}; for (const t of Object.keys(core)) out[t] = toObj(PERSONS.map((per) => p + core[t][per]))
     return out
   }
   return null
@@ -112,12 +124,14 @@ const MANUAL = {
     indefinido: { yo: 'hube', tu: 'hubiste', el: 'hubo', nosotros: 'hubimos', vosotros: 'hubisteis', ellos: 'hubieron' },
     imperfecto: { yo: 'había', tu: 'habías', el: 'había', nosotros: 'habíamos', vosotros: 'habíais', ellos: 'habían' },
     futuro: { yo: 'habré', tu: 'habrás', el: 'habrá', nosotros: 'habremos', vosotros: 'habréis', ellos: 'habrán' },
+    subjuntivo: { yo: 'haya', tu: 'hayas', el: 'haya', nosotros: 'hayamos', vosotros: 'hayáis', ellos: 'hayan' },
   },
   cambiar: {
     presente: { yo: 'cambio', tu: 'cambias', el: 'cambia', nosotros: 'cambiamos', vosotros: 'cambiáis', ellos: 'cambian' },
     indefinido: { yo: 'cambié', tu: 'cambiaste', el: 'cambió', nosotros: 'cambiamos', vosotros: 'cambiasteis', ellos: 'cambiaron' },
     imperfecto: { yo: 'cambiaba', tu: 'cambiabas', el: 'cambiaba', nosotros: 'cambiábamos', vosotros: 'cambiabais', ellos: 'cambiaban' },
     futuro: { yo: 'cambiaré', tu: 'cambiarás', el: 'cambiará', nosotros: 'cambiaremos', vosotros: 'cambiaréis', ellos: 'cambiarán' },
+    subjuntivo: { yo: 'cambie', tu: 'cambies', el: 'cambie', nosotros: 'cambiemos', vosotros: 'cambiéis', ellos: 'cambien' },
   },
 }
 const REFLEX = { yo: 'me', tu: 'te', el: 'se', nosotros: 'nos', vosotros: 'os', ellos: 'se' }

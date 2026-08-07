@@ -73,7 +73,7 @@ export default function ConjugationView({ verbs, tableMissing, onStart }: Props)
           </h2>
         </div>
         <p className="import-hint">
-          Practice conjugating your verbs across the four core tenses. Pick a mode and which
+          Practice conjugating your verbs across the core tenses. Pick a mode and which
           tenses to drill, then start with the whole list or a single verb.
         </p>
 
