@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 export type Person = 'yo' | 'tu' | 'el' | 'nosotros' | 'vosotros' | 'ellos'
-export type Tense = 'presente' | 'indefinido' | 'imperfecto' | 'futuro' | 'subjuntivo'
+export type Tense = 'presente' | 'indefinido' | 'imperfecto' | 'futuro' | 'condicional' | 'subjuntivo'
 export type Conjugations = Partial<Record<Tense, Record<Person, string>>>
 
 export type Verb = {
@@ -15,12 +15,13 @@ export type Verb = {
   created_at: string
 }
 
-export const TENSES: Tense[] = ['presente', 'indefinido', 'imperfecto', 'futuro', 'subjuntivo']
+export const TENSES: Tense[] = ['presente', 'indefinido', 'imperfecto', 'futuro', 'condicional', 'subjuntivo']
 export const TENSE_LABELS: Record<Tense, string> = {
   presente: 'Presente',
   indefinido: 'Indefinido',
   imperfecto: 'Imperfecto',
   futuro: 'Futuro',
+  condicional: 'Condicional',
   subjuntivo: 'Subjuntivo',
 }
 export const PERSONS: Person[] = ['yo', 'tu', 'el', 'nosotros', 'vosotros', 'ellos']

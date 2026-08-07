@@ -56,10 +56,10 @@ function parseCsv(text) {
   return rows
 }
 
-const TENSE = { Presente: 'presente', 'Pretérito': 'indefinido', Imperfecto: 'imperfecto', Futuro: 'futuro' }
+const TENSE = { Presente: 'presente', 'Pretérito': 'indefinido', Imperfecto: 'imperfecto', Futuro: 'futuro', Condicional: 'condicional' }
 const PERSONS = ['yo', 'tu', 'el', 'nosotros', 'vosotros', 'ellos']
 const CORE_INDIC = ['presente', 'indefinido', 'imperfecto', 'futuro']
-const TENSE_KEYS = [...CORE_INDIC, 'subjuntivo']
+const TENSE_KEYS = [...CORE_INDIC, 'subjuntivo', 'condicional']
 const jehle = new Map()
 for (const row of parseCsv(fs.readFileSync(JEHLE_PATH, 'utf8')).slice(1)) {
   let key = null
@@ -80,6 +80,7 @@ const REG = { ar: ['o', 'as', 'a', 'amos', 'áis', 'an'], er: ['o', 'es', 'e', '
 const PRET = { ar: ['é', 'aste', 'ó', 'amos', 'asteis', 'aron'], er: ['í', 'iste', 'ió', 'imos', 'isteis', 'ieron'], ir: ['í', 'iste', 'ió', 'imos', 'isteis', 'ieron'] }
 const IMPF = { ar: ['aba', 'abas', 'aba', 'ábamos', 'abais', 'aban'], er: ['ía', 'ías', 'ía', 'íamos', 'íais', 'ían'], ir: ['ía', 'ías', 'ía', 'íamos', 'íais', 'ían'] }
 const FUT = ['é', 'ás', 'á', 'emos', 'éis', 'án']
+const COND = ['ía', 'ías', 'ía', 'íamos', 'íais', 'ían']
 const RISKY = /(acer|ecer|ocer|ucir|uir|eer|ñir|güir|iar|uar)$/
 const SUBJ = { ar: ['e', 'es', 'e', 'emos', 'éis', 'en'], er: ['a', 'as', 'a', 'amos', 'áis', 'an'], ir: ['a', 'as', 'a', 'amos', 'áis', 'an'] }
 const toObj = (arr) => { const o = {}; PERSONS.forEach((p, i) => (o[p] = arr[i])); return o }
@@ -103,6 +104,7 @@ function regularConjugate(base) {
     indefinido: toObj(pret),
     imperfecto: toObj(IMPF[end].map((e) => stem + e)),
     futuro: toObj(FUT.map((e) => base + e)),
+    condicional: toObj(COND.map((e) => base + e)),
     subjuntivo: toObj(SUBJ[end].map((e) => subjStem + e)),
   }
 }
@@ -124,6 +126,7 @@ const MANUAL = {
     indefinido: { yo: 'hube', tu: 'hubiste', el: 'hubo', nosotros: 'hubimos', vosotros: 'hubisteis', ellos: 'hubieron' },
     imperfecto: { yo: 'había', tu: 'habías', el: 'había', nosotros: 'habíamos', vosotros: 'habíais', ellos: 'habían' },
     futuro: { yo: 'habré', tu: 'habrás', el: 'habrá', nosotros: 'habremos', vosotros: 'habréis', ellos: 'habrán' },
+    condicional: { yo: 'habría', tu: 'habrías', el: 'habría', nosotros: 'habríamos', vosotros: 'habríais', ellos: 'habrían' },
     subjuntivo: { yo: 'haya', tu: 'hayas', el: 'haya', nosotros: 'hayamos', vosotros: 'hayáis', ellos: 'hayan' },
   },
   cambiar: {
@@ -131,6 +134,7 @@ const MANUAL = {
     indefinido: { yo: 'cambié', tu: 'cambiaste', el: 'cambió', nosotros: 'cambiamos', vosotros: 'cambiasteis', ellos: 'cambiaron' },
     imperfecto: { yo: 'cambiaba', tu: 'cambiabas', el: 'cambiaba', nosotros: 'cambiábamos', vosotros: 'cambiabais', ellos: 'cambiaban' },
     futuro: { yo: 'cambiaré', tu: 'cambiarás', el: 'cambiará', nosotros: 'cambiaremos', vosotros: 'cambiaréis', ellos: 'cambiarán' },
+    condicional: { yo: 'cambiaría', tu: 'cambiarías', el: 'cambiaría', nosotros: 'cambiaríamos', vosotros: 'cambiaríais', ellos: 'cambiarían' },
     subjuntivo: { yo: 'cambie', tu: 'cambies', el: 'cambie', nosotros: 'cambiemos', vosotros: 'cambiéis', ellos: 'cambien' },
   },
 }
