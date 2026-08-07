@@ -57,3 +57,31 @@ create policy "anon full access to categories"
   to anon
   using (true)
   with check (true);
+
+-- Verbs: conjugation data for the verb cards. conjugations is a jsonb object
+-- keyed by tense, each holding the six person forms, e.g.
+--   { "presente": {"yo":"hablo","tu":"hablas","el":"habla",
+--                  "nosotros":"hablamos","vosotros":"habláis","ellos":"hablan"},
+--     "indefinido": {...}, "imperfecto": {...}, "futuro": {...} }
+create table if not exists public.verbs (
+  id           uuid primary key default gen_random_uuid(),
+  card_id      uuid references public.cards(id) on delete set null,
+  infinitive   text not null,
+  german       text,
+  reflexive    boolean not null default false,
+  irregular    boolean not null default false,
+  conjugations jsonb not null default '{}',
+  created_at   timestamptz not null default now()
+);
+
+create unique index if not exists verbs_infinitive_idx on public.verbs (infinitive);
+
+alter table public.verbs enable row level security;
+
+drop policy if exists "anon full access to verbs" on public.verbs;
+create policy "anon full access to verbs"
+  on public.verbs
+  for all
+  to anon
+  using (true)
+  with check (true);

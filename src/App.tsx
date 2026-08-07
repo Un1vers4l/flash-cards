@@ -3,15 +3,23 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { isSupabaseConfigured } from './lib/supabase'
 import { activateCards, fetchCards, setCardActive } from './lib/cards'
 import { type Category, fetchCategories, isMissingTableError } from './lib/categories'
+import {
+  type Tense,
+  type Verb,
+  fetchVerbs,
+  isMissingTableError as isVerbsTableMissing,
+} from './lib/verbs'
 import { type Card, MAX_DUE, isDue, todayKey } from './lib/srs'
 import Login from './components/Login'
 import Home from './components/Home'
 import ManageVocab from './components/ManageVocab'
 import CategoriesView from './components/CategoriesView'
+import ConjugationView, { type DrillMode } from './components/ConjugationView'
+import ConjugationSession from './components/ConjugationSession'
 import StudySession from './components/StudySession'
 import PracticeSession from './components/PracticeSession'
 
-type View = 'home' | 'manage' | 'categories' | 'study' | 'practice'
+type View = 'home' | 'manage' | 'categories' | 'verbs' | 'study' | 'practice' | 'conjugate'
 
 function ConfigWarning() {
   return (
@@ -35,6 +43,8 @@ function Shell() {
   const [cards, setCards] = useState<Card[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriesMissing, setCategoriesMissing] = useState(false)
+  const [verbs, setVerbs] = useState<Verb[]>([])
+  const [verbsMissing, setVerbsMissing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,6 +54,12 @@ function Shell() {
   const [practice, setPractice] = useState<{ cards: Card[]; title: string }>({
     cards: [],
     title: '',
+  })
+  // The verbs + tenses + mode for a conjugation drill.
+  const [conjDrill, setConjDrill] = useState<{ verbs: Verb[]; tenses: Tense[]; mode: DrillMode }>({
+    verbs: [],
+    tenses: [],
+    mode: 'table',
   })
 
   const load = useCallback(async () => {
@@ -70,10 +86,22 @@ function Shell() {
     }
   }, [])
 
+  const loadVerbs = useCallback(async () => {
+    try {
+      const data = await fetchVerbs()
+      setVerbs(data)
+      setVerbsMissing(false)
+    } catch (err) {
+      if (isVerbsTableMissing(err)) setVerbsMissing(true)
+      else console.error(err)
+    }
+  }, [])
+
   useEffect(() => {
     load()
     loadCategories()
-  }, [load, loadCategories])
+    loadVerbs()
+  }, [load, loadCategories, loadVerbs])
 
   const patchCard = useCallback((id: string, changes: Partial<Card>) => {
     setCards((cs) => cs.map((c) => (c.id === id ? { ...c, ...changes } : c)))
@@ -110,6 +138,12 @@ function Shell() {
     if (practiceCards.length === 0) return
     setPractice({ cards: practiceCards, title })
     setView('practice')
+  }
+
+  function startConjugation(drillVerbs: Verb[], tenses: Tense[], mode: DrillMode) {
+    if (drillVerbs.length === 0 || tenses.length === 0) return
+    setConjDrill({ verbs: drillVerbs, tenses, mode })
+    setView('conjugate')
   }
 
   async function handleSetActive(card: Card, active: boolean) {
@@ -163,6 +197,12 @@ function Shell() {
           >
             Practice
           </button>
+          <button
+            className={`nav-link ${view === 'verbs' || view === 'conjugate' ? 'is-active' : ''}`}
+            onClick={() => setView('verbs')}
+          >
+            Verbs
+          </button>
           <button className="nav-link" onClick={logout}>
             Sign out
           </button>
@@ -194,6 +234,15 @@ function Shell() {
             title={practice.title}
             onExit={() => setView('categories')}
           />
+        ) : view === 'conjugate' ? (
+          <ConjugationSession
+            verbs={conjDrill.verbs}
+            tenses={conjDrill.tenses}
+            mode={conjDrill.mode}
+            onExit={() => setView('verbs')}
+          />
+        ) : view === 'verbs' ? (
+          <ConjugationView verbs={verbs} tableMissing={verbsMissing} onStart={startConjugation} />
         ) : view === 'manage' ? (
           <ManageVocab
             cards={cards}
