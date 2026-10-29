@@ -1,0 +1,35 @@
+name: Supabase keep-alive
+
+# The Supabase free tier pauses a project after ~7 days of inactivity. This
+# workflow pings the production project's REST API once a day so it stays
+# active. A paused project can't keep itself awake, so the ping has to come from
+# outside (here) and hit the database (a tiny query), not just the static site.
+#
+# Setup — add these as repository secrets (Settings → Secrets and variables →
+# Actions):
+#   SUPABASE_PROD_URL        e.g. https://xxxx.supabase.co
+#   SUPABASE_PROD_ANON_KEY   the anon / public key
+
+on:
+  schedule:
+    - cron: '17 6 * * *' # daily at 06:17 UTC (off the hour to dodge load spikes)
+  workflow_dispatch: {} # lets you trigger it manually from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping production
+        env:
+          URL: ${{ secrets.SUPABASE_PROD_URL }}
+          KEY: ${{ secrets.SUPABASE_PROD_ANON_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "::error::SUPABASE_PROD_URL / SUPABASE_PROD_ANON_KEY secrets are not set."
+            exit 1
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$URL/rest/v1/cards?select=id&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          echo "production -> HTTP $code"
+          test "$code" = "200"
